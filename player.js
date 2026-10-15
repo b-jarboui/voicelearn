@@ -46,31 +46,36 @@
     const vs = enVoices();
     return vs.find((v) => v.voiceURI === VS.uri) || vs.find((v) => v.localService && /en[-_]US/i.test(v.lang)) || vs.find((v) => v.localService) || vs.find((v) => v.default) || vs[0];
   }
-  // Speak list[from..] one sentence at a time; a watchdog covers mobile Chrome's lost 'end' events.
-  function speak(list, from, onSentence, onDone) {
+  // Speak list[from..] as one continuous queue: the engine flows from sentence to sentence with no
+  // round-trip pause. Each sentence's onstart drives the visuals. A watchdog restarts from the next
+  // unheard sentence if the engine stalls or drops events (mobile Chrome).
+  function speak(list, from, onSentence, onDone, tries = 0) {
     const my = ++tok; synth.cancel();
-    let i = from;
-    const next = () => {
-      if (my !== tok) return;
-      if (i >= list.length) return onDone();
-      onSentence(i);
-      const u = new SpeechSynthesisUtterance(list[i]), v = voice();
+    if (from >= list.length) return onDone();
+    let shown = from - 1, started = from - 1, done = false, quiet = 0;
+    const show = (i) => { if (my === tok && i > shown) { shown = i; onSentence(i); } };
+    const finish = () => { if (done || my !== tok) return; done = true; clearInterval(dog); onDone(); };
+    const v = voice();
+    for (let i = from; i < list.length; i++) {
+      const u = new SpeechSynthesisUtterance(list[i]);
       if (v) { u.voice = v; u.lang = v.lang; } else u.lang = "en-US";
       u.rate = VS.rate; u.pitch = VS.pitch;
-      let started = false, ended = false, quiet = 0;
-      const finish = () => { if (ended || my !== tok) return; ended = true; clearInterval(dog); i++; setTimeout(next, 120); };
-      const dog = setInterval(() => {
-        if (my !== tok) return clearInterval(dog);
-        if (document.hidden) { quiet = 0; return; } // don't skip ahead while the phone is asleep
-        if (synth.speaking) { started = true; quiet = 0; return; }
-        if (++quiet >= (started ? 3 : 10)) finish();
-      }, 500);
-      u.onstart = () => (started = true);
-      u.onend = finish;
-      u.onerror = (e) => { if (e.error !== "interrupted" && e.error !== "canceled") finish(); };
+      u.onstart = () => { if (my !== tok) return; started = Math.max(started, i); show(i); };
+      if (i === list.length - 1) u.onend = finish;
+      u.onerror = (e) => { if (e.error !== "interrupted" && e.error !== "canceled" && i === list.length - 1) finish(); };
       synth.speak(u);
-    };
-    next();
+    }
+    show(from); // first visual immediately, no waiting for the engine
+    const dog = setInterval(() => {
+      if (my !== tok || done) return clearInterval(dog);
+      if (document.hidden || synth.speaking || synth.pending) { quiet = 0; return; } // asleep, or still talking
+      if (++quiet < (started >= from ? 3 : 10)) return;
+      clearInterval(dog);
+      if (started >= list.length - 1) return finish();
+      // Stalled: resume after the last sentence that really started (or skip one if nothing ever starts).
+      const next = started >= from ? started + 1 : (tries >= 1 ? from + 1 : from);
+      speak(list, next, onSentence, onDone, started >= from ? 0 : tries + 1);
+    }, 500);
   }
   const stopSpeech = () => { tok++; synth.cancel(); };
 
@@ -114,6 +119,32 @@
   // ---------- views ----------
   const stageEl = document.createElement("div");
   Scenes.mount(stageEl);
+  // Lesson "look": Story cards or Signal Studio (style engines from lab/), fed with MOMENTS.
+  // Checks, results and the report keep the classic interactive stage.
+  const lookEl = document.createElement("div");
+  lookEl.className = "look";
+  let look = null, lookStep = -1;
+  const lookStyle = () => (window.STYLES || []).find((s) => s.id === (VS.look || "story")) || null;
+  function fitLook() {
+    const k = Math.max(1, Math.min(lookEl.clientHeight / 600, lookEl.clientWidth / 300, 2.2));
+    lookEl.style.setProperty("--k", k.toFixed(3));
+    lookEl.toggleAttribute("data-tall", lookEl.clientHeight / Math.max(1, lookEl.clientWidth) > 1.75);
+  }
+  function showLook(on) { lookEl.hidden = !on; stageEl.hidden = on; }
+  function vstep(j) {
+    if (look) { lookStep = j; look.step(j); } else Scenes.step(Math.max(0, j));
+  }
+  // Build the look for a section/review; returns false if no moments exist (classic stage is used instead).
+  function loadLook(key, lessonLabel, title, body) {
+    const s = lookStyle(), moments = window.MOMENTS && MOMENTS[key];
+    look = null;
+    if (!s || !moments) { showLook(false); return false; }
+    showLook(true);
+    s.mount(lookEl); fitLook();
+    s.load({ lesson: lessonLabel, title, sentences: body, moments });
+    look = s; lookStep = -1; s.step(-1);
+    return true;
+  }
 
   function loBadges() {
     return LOS.map((k) => {
@@ -143,6 +174,7 @@
     view = "player"; document.body.dataset.view = "player";
     $("main").innerHTML = `<div class="player"><div id="slot"></div></div><div class="cc" id="cc"></div><div class="card send" id="send" hidden></div>`;
     $("slot").replaceWith(stageEl);
+    stageEl.after(lookEl);
     window.scrollTo(0, 0);
     load(); play();
   }
@@ -162,13 +194,16 @@
     if (st.kind === "sec") {
       const les = C.lessons[st.l], sec = les.sections[st.s];
       const intro = (st.s === 0 ? [`Lesson ${st.l + 1}. ${les.title}.`] : []).concat([sec.title + "."]);
-      script = { main: intro.concat(sentences(sec.script)), offset: intro.length };
-      Scenes.load(st.l, st.s, true);
+      const body = sentences(sec.script);
+      script = { main: intro.concat(body), offset: intro.length };
+      if (!loadLook(`${les.id}:${st.s}`, `Lesson ${st.l + 1} · ${les.title}`, sec.title, body)) Scenes.load(st.l, st.s, true);
     } else if (st.kind === "review") {
-      const r = A.review[st.lo];
-      script = { main: [`Review. ${r.title}.`].concat(sentences(r.script)), offset: 1 };
-      Scenes.loadBeats(`<b>Review</b> · ${esc(A.outcomes[st.lo].full)}`, "", r.beats);
-    } else if (st.kind === "quiz") loadQuestion(st);
+      const r = A.review[st.lo], body = sentences(r.script);
+      script = { main: [`Review. ${r.title}.`].concat(body), offset: 1 };
+      if (!loadLook(`review:${st.lo}`, `Review · ${A.outcomes[st.lo].name}`, r.title, body))
+        Scenes.loadBeats(`<b>Review</b> · ${esc(A.outcomes[st.lo].full)}`, "", r.beats);
+    } else { look = null; showLook(false); }
+    if (st.kind === "quiz") loadQuestion(st);
     else if (st.kind === "result") loadResult(st);
     else if (st.kind === "report") loadReport();
     renderSend(st.kind === "report" && !!T.sendReport);
@@ -328,7 +363,7 @@
     if (!list) { P.part = "main"; P.sent = 0; return play(); }
     speak(list, P.sent, (i) => {
       P.sent = i; save(); caption(list[i]);
-      if (P.part === "main") Scenes.step(Math.max(0, i - script.offset));
+      if (P.part === "main") vstep(i - script.offset);
     }, () => {
       if (st.kind === "quiz" && P.part === "main") { // wait for a tap
         playing = false; waiting = true; P.sent = 0; save(); caption("Tap your answer."); return bar();
@@ -375,10 +410,11 @@
       if (on && !document.fullscreenElement && document.documentElement.requestFullscreen) document.documentElement.requestFullscreen({ navigationUI: "hide" }).catch(() => {});
       if (!on && document.fullscreenElement) document.exitFullscreen().catch(() => {});
     } catch (e) {}
-    setTimeout(() => Scenes.fit(), 350); // rescale and re-centre the scene for the new size
+    setTimeout(refit, 350); // rescale and re-centre the scene for the new size
   }
+  function refit() { Scenes.fit(); if (look) { fitLook(); look.step(lookStep); } }
   $("fsBtn").onclick = () => setFs(!document.body.classList.contains("fs"));
-  window.addEventListener("resize", () => { if (view === "player") Scenes.fit(); });
+  window.addEventListener("resize", () => { if (view === "player") refit(); });
   document.addEventListener("fullscreenchange", () => { if (!document.fullscreenElement) setFs(false); });
   document.addEventListener("keydown", (e) => { if (e.key === "Escape") setFs(false); });
 
@@ -392,7 +428,16 @@
   // Re-speak the current sentence so a change is heard right away.
   const applyLive = () => { if (playing) play(); };
   const showPitch = () => { $("vPitchOut").textContent = VS.pitch < 0.95 ? "deeper" : VS.pitch > 1.05 ? "higher" : "normal"; };
-  $("vBtn").onclick = () => { fillVoices(); $("vRate").value = VS.rate; $("vPitch").value = VS.pitch; showRate(); showPitch(); $("vPanel").hidden = !$("vPanel").hidden; };
+  $("vLook").onchange = (e) => {
+    VS.look = e.target.value; saveVS();
+    const st = cur();
+    if (view !== "player" || (st.kind !== "sec" && st.kind !== "review")) return;
+    const wasPlaying = playing;
+    if (wasPlaying) { stopSpeech(); }
+    load();
+    if (wasPlaying) play(); else vstep(P.sent - script.offset);
+  };
+  $("vBtn").onclick = () => { $("vLook").value = VS.look || "story"; fillVoices(); $("vRate").value = VS.rate; $("vPitch").value = VS.pitch; showRate(); showPitch(); $("vPanel").hidden = !$("vPanel").hidden; };
   $("vPitch").oninput = (e) => { VS.pitch = +e.target.value; showPitch(); };
   $("vPitch").onchange = () => { saveVS(); applyLive(); };
   $("vClose").onclick = () => ($("vPanel").hidden = true);

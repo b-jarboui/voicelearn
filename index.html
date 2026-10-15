@@ -42,7 +42,9 @@ button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
 .pill.now{color:var(--accent);border-color:var(--accent)}
 .pill.warn{color:var(--warn);border-color:var(--warn)}
 .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
-.player .stage{height:max(340px,calc(100dvh - 250px))}
+.player .stage,.player .look{height:max(340px,calc(100dvh - 250px))}
+.player .look{position:relative;border-radius:16px;overflow:hidden;background:#0c0c10}
+body.fs .player .look{position:fixed;left:0;right:0;top:0;bottom:calc(150px + env(safe-area-inset-bottom,0px));height:auto;border-radius:0;z-index:50}
 .cc{min-height:3.2em;font-size:18px;line-height:1.45;text-align:center;padding-inline:8px;text-wrap:balance}
 .bar{position:fixed;left:0;right:0;bottom:0;background:var(--surface);border-top:1px solid var(--line);
   padding:12px 16px calc(12px + env(safe-area-inset-bottom,0px))}
@@ -83,6 +85,7 @@ body.fs .send{display:none}
 </header>
 <div class="vpanel card" id="vPanel" hidden>
   <div class="row" style="justify-content:space-between"><b>Voice &amp; speed</b><button id="vClose" aria-label="Close">✕</button></div>
+  <label class="fld">Look<select id="vLook"><option value="story">Story cards</option><option value="codex">Signal Studio</option></select></label>
   <label class="fld">Voice<select id="vVoice"></select></label>
   <label class="fld">Speed <output id="vRateOut">1×</output><input id="vRate" type="range" min="0.75" max="2" step="0.25" value="1"></label>
   <div class="row muted" style="justify-content:space-between;font-size:13px"><span>0.75×</span><span>1×</span><span>1.5×</span><span>2×</span></div>
@@ -101,6 +104,11 @@ body.fs .send{display:none}
 <script src="course.js?v=2"></script>
 <script src="adaptive.js?v=1"></script>
 <script src="scenes.js?v=7"></script>
-<script src="player.js?v=11"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="lab/content.js?v=4"></script>
+<script src="lab/style-story.js?v=3"></script>
+<script src="lab/style-codex.js?v=5"></script>
+<script src="moments.js?v=1"></script>
+<script src="player.js?v=12"></script>
 </body>
 </html>

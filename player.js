@@ -36,9 +36,15 @@
 
   // ---------- speech ----------
   const synth = window.speechSynthesis;
+  // Listener's voice + speed (this device).
+  const VKEY = "voicelearn.voice.v1";
+  let VS = { uri: "", rate: 1 };
+  try { VS = Object.assign(VS, JSON.parse(localStorage.getItem(VKEY)) || {}); } catch (e) {}
+  const saveVS = () => { try { localStorage.setItem(VKEY, JSON.stringify(VS)); } catch (e) {} };
+  const enVoices = () => synth.getVoices().filter((v) => /^en/i.test(v.lang));
   function voice() {
-    const vs = synth.getVoices().filter((v) => /^en/i.test(v.lang));
-    return vs.find((v) => v.localService && /en[-_]US/i.test(v.lang)) || vs.find((v) => v.localService) || vs.find((v) => v.default) || vs[0];
+    const vs = enVoices();
+    return vs.find((v) => v.voiceURI === VS.uri) || vs.find((v) => v.localService && /en[-_]US/i.test(v.lang)) || vs.find((v) => v.localService) || vs.find((v) => v.default) || vs[0];
   }
   // Speak list[from..] one sentence at a time; a watchdog covers mobile Chrome's lost 'end' events.
   function speak(list, from, onSentence, onDone) {
@@ -50,6 +56,7 @@
       onSentence(i);
       const u = new SpeechSynthesisUtterance(list[i]), v = voice();
       if (v) { u.voice = v; u.lang = v.lang; } else u.lang = "en-US";
+      u.rate = VS.rate;
       let started = false, ended = false, quiet = 0;
       const finish = () => { if (ended || my !== tok) return; ended = true; clearInterval(dog); i++; setTimeout(next, 120); };
       const dog = setInterval(() => {
@@ -121,7 +128,7 @@
   }
   function openPlayer() {
     view = "player"; document.body.dataset.view = "player";
-    $("main").innerHTML = `<div class="player"><div id="slot"></div></div><div class="cc" id="cc"></div>`;
+    $("main").innerHTML = `<div class="player"><div id="slot"></div></div><div class="cc" id="cc"></div><div class="card send" id="send" hidden></div>`;
     $("slot").replaceWith(stageEl);
     window.scrollTo(0, 0);
     load(); play();
@@ -151,6 +158,62 @@
     } else if (st.kind === "quiz") loadQuestion(st);
     else if (st.kind === "result") loadResult(st);
     else if (st.kind === "report") loadReport();
+    renderSend(st.kind === "report" && !!T.sendReport);
+  }
+
+  // ---------- send the achievement report (no server: mail app, share sheet, or copy) ----------
+  const PREF = "voicelearn.sender.v1", T = C.teacher || { name: C.author, email: "" };
+  let pref = {};
+  try { pref = JSON.parse(localStorage.getItem(PREF)) || {}; } catch (e) {}
+
+  function reportText(name) {
+    const line = (k) => { const m = P.lo[k]; return `- ${A.outcomes[k].full}: ${m == null ? "not assessed" : pct(m) + "%"}${m != null && m < A.target ? "  (below target)" : ""}`; };
+    const vals = LOS.map((k) => P.lo[k] ?? 0), overall = vals.reduce((a, b) => a + b, 0) / LOS.length;
+    const weak = LOS.filter((k) => (P.lo[k] ?? 0) < A.target);
+    return [
+      `VoiceLearn achievement report`,
+      `Student: ${name || "(not given)"}`,
+      `Teacher: ${T.name}`,
+      `Course: ${C.code} · ${C.title}`,
+      `Date: ${new Date().toLocaleString()}`,
+      ``,
+      `Overall mastery: ${pct(overall)}% (target ${pct(A.target)}%)`,
+      ``,
+      `Learning outcomes:`,
+      ...LOS.map(line),
+      ``,
+      `Lessons:`,
+      ...C.lessons.map((x, l) => { const r = P.lessons[x.id]; return `- Lesson ${l + 1}, ${x.title}: ${r ? `${pct(r.score)}% after ${r.rounds} round${r.rounds > 1 ? "s" : ""}${r.passed ? "" : " (flagged)"}` : "not completed"}`; }),
+      ``,
+      weak.length ? `Recommended follow-up: ${weak.map((k) => A.outcomes[k].name).join(", ")}.` : `All learning outcomes achieved.`,
+      `Questions answered: ${P.hist.length}, correct: ${P.hist.filter((h) => h.ok).length}.`,
+    ].join("\n");
+  }
+
+  function renderSend(show) {
+    const box = $("send"); if (!box) return;
+    box.hidden = !show; if (!show) return;
+    box.innerHTML = `
+      <div class="eyebrow">Send your report to your teacher</div>
+      <div><b>To:</b> ${esc(T.name)}</div>
+      <label class="fld">Your name<input id="sName" autocomplete="name" value="${esc(pref.name || "")}"></label>
+      <div class="row"><button class="primary" id="sMail">✉ Send report</button>${navigator.share ? '<button id="sShare">Share…</button>' : ""}<button id="sCopy">Copy report</button></div>
+      <div class="muted" id="sMsg" role="status" style="font-size:15px">Opens your mail app with the report ready. Tap Send there.</div>`;
+    const keep = () => { pref = { name: $("sName").value.trim() }; try { localStorage.setItem(PREF, JSON.stringify(pref)); } catch (e) {} };
+    const subject = () => `${C.code} achievement report – ${$("sName").value.trim() || "student"}`;
+    $("sMail").onclick = () => {
+      keep();
+      if (!pref.name) { $("sMsg").textContent = "Enter your name first."; $("sName").focus(); return; }
+      const to = T.email || "";
+      location.href = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject())}&body=${encodeURIComponent(reportText(pref.name))}`;
+      $("sMsg").textContent = "Your mail app should open with the report. Tap Send there.";
+    };
+    if ($("sShare")) $("sShare").onclick = async () => { keep(); try { await navigator.share({ title: subject(), text: reportText(pref.name) }); } catch (e) {} };
+    $("sCopy").onclick = async () => {
+      keep();
+      try { await navigator.clipboard.writeText(reportText(pref.name)); $("sMsg").textContent = "Report copied. Paste it into any email or message."; }
+      catch (e) { $("sMsg").textContent = "Couldn't copy automatically."; }
+    };
   }
 
   function loadQuestion(st) {
@@ -226,8 +289,10 @@
       { at: 1, fx: "bars", html: `<div class="st-score ${overall >= A.target ? "good" : "bad"}"><span data-count="${pct(overall)}" data-unit="%">0%</span><small>overall mastery</small></div>` },
       { at: 2, html: `<div class="st-los">${LOS.map((k, i) => { const m = P.lo[k] ?? 0; return `<div class="st-it st-lo" data-at="${2 + i}"><div class="st-lo-h"><b>${esc(A.outcomes[k].full)}</b><span>${pct(m)}%</span></div><div class="st-lo-t"><i class="${m >= A.target ? "good" : "bad"}" style="--w:${pct(m)}%"></i><em style="left:${pct(A.target)}%"></em></div></div>`; }).join("")}</div>` },
       { at: say.length - 1, html: weak.length ? `<div class="st-kicker" style="color:var(--st-warm)">Recommended</div><div class="st-cards">${weak.map((k) => `<button class="st-card st-go" data-lo="${k}"><b>${esc(A.outcomes[k].name)} ▶</b><span>Tap to review and practise again</span></button>`).join("")}</div>` : `<div class="st-quote">All outcomes <em>achieved</em>.</div>` },
+      ...(T.sendReport ? [{ at: say.length - 1, html: `<button class="st-card st-send"><b>✉ Send this report</b><span>By email or share</span></button>` }] : []),
     ]);
     stageEl.querySelectorAll(".st-go").forEach((b) => (b.onclick = () => extraPractice(b.dataset.lo)));
+    if (T.sendReport) stageEl.querySelector(".st-send").onclick = () => { pause(); const s = $("send"); if (s) { s.scrollIntoView({ behavior: "smooth", block: "center" }); setTimeout(() => $(pref.name ? "sMail" : "sName")?.focus(), 500); } };
   }
 
   // From the report: one more review + practice round on a chosen outcome, then an updated report.
@@ -285,9 +350,29 @@
     playing ? pause() : play();
   };
   $("home").onclick = () => { pause(); waiting = false; renderHome(); };
+
+  // ---------- voice settings panel ----------
+  function fillVoices() {
+    const sel = $("vVoice"), cur = voice(), vs = enVoices();
+    sel.innerHTML = vs.length ? vs.map((v) => `<option value="${esc(v.voiceURI)}" ${cur && v.voiceURI === cur.voiceURI ? "selected" : ""}>${esc(v.name.replace(/^(Microsoft|Google)\s+/, ""))} · ${esc(v.lang)}</option>`).join("")
+      : "<option>Default voice</option>";
+  }
+  const showRate = () => { $("vRateOut").textContent = VS.rate.toFixed(2).replace(/0$/, "") + "×"; };
+  // Re-speak the current sentence so a change is heard right away.
+  const applyLive = () => { if (playing) play(); };
+  $("vBtn").onclick = () => { fillVoices(); $("vRate").value = VS.rate; showRate(); $("vPanel").hidden = !$("vPanel").hidden; };
+  $("vClose").onclick = () => ($("vPanel").hidden = true);
+  $("vVoice").onchange = (e) => { VS.uri = e.target.value; saveVS(); applyLive(); };
+  $("vRate").oninput = (e) => { VS.rate = +e.target.value; showRate(); };
+  $("vRate").onchange = () => { saveVS(); applyLive(); };
+  $("vTest").onclick = () => {
+    if (playing) pause();
+    speak(["Hello. This is how your lessons will sound."], 0, () => {}, () => {});
+  };
+  if (synth.addEventListener) synth.addEventListener("voiceschanged", () => { if (!$("vPanel").hidden) fillVoices(); });
   document.addEventListener("keydown", (e) => { if (e.code === "Space" && view === "player") { e.preventDefault(); $("toggle").click(); } });
   if (synth.onvoiceschanged !== undefined) synth.onvoiceschanged = () => {};
-  window.__vl = { state: () => P, answer, advance }; // test hook
+  window.__vl = { state: () => P, answer, advance, reportText }; // test hook
 
   renderHome();
 })();

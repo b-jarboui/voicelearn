@@ -6,6 +6,8 @@ window.COURSE = {
   title: "Introduction to Data Quality",
   subtitle: "Big Data Analytics · Week 2",
   author: "Prof. Bassem Jarboui",
+  // Achievement reports are sent to the course teacher. Off for now; set sendReport: true (and an email) to enable.
+  teacher: { name: "Prof. Bassem Jarboui", email: "", sendReport: false },
   lessons: [
     {
       id: "l1",

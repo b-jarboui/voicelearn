@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>VoiceLearn Prototype</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&display=swap">
+<link rel="stylesheet" href="scenes.css?v=2">
+<style>
+/* Layout: one column of content, a fixed "voice dock" at the bottom that owns the mic. */
+:root{
+  --bg:#EEF2F6; --surface:#FFFFFF; --ink:#142033; --muted:#5B6B82; --line:#D5DDE7;
+  --accent:#1F5EFF; --accent-ink:#FFFFFF; --live:#D93A40; --ok:#1E8E5A; --bad:#C4372F; --hl:#DCE6FF;
+  --display:"Bricolage Grotesque",system-ui,sans-serif; --body:"Atkinson Hyperlegible",system-ui,sans-serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0D131C; --surface:#151D29; --ink:#E8EEF6; --muted:#93A3B8; --line:#263245;
+  --accent:#6C9BFF; --accent-ink:#0D131C; --live:#FF6369; --ok:#3DD68C; --bad:#FF7A70; --hl:#1E2C4A; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0D131C; --surface:#151D29; --ink:#E8EEF6; --muted:#93A3B8; --line:#263245;
+  --accent:#6C9BFF; --accent-ink:#0D131C; --live:#FF6369; --ok:#3DD68C; --bad:#FF7A70; --hl:#1E2C4A; color-scheme:dark}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:17px/1.55 var(--body);padding:0 16px 230px}
+[hidden]{display:none!important}
+header{display:flex;align-items:center;justify-content:space-between;gap:12px;max-width:760px;margin:0 auto;padding-block:16px}
+.brand{font:800 20px var(--display);letter-spacing:-.01em;cursor:pointer}
+.brand span{color:var(--accent)}
+main{max-width:760px;margin:0 auto;display:grid;gap:16px}
+h1,h2{font-family:var(--display);text-wrap:balance;margin:0;line-height:1.15}
+h1{font-size:28px} h2{font-size:21px}
+.eyebrow{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:700}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px;display:grid;gap:10px;min-width:0}
+.muted{color:var(--muted)}
+button{font:inherit;cursor:pointer;border-radius:10px;border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:10px 14px}
+button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:700}
+button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.lesson{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:12px 0;border-top:1px solid var(--line)}
+.lesson:first-child{border-top:0}
+.pill{font-size:13px;padding:2px 10px;border-radius:99px;border:1px solid var(--line);color:var(--muted);white-space:nowrap}
+.pill.done{color:var(--ok);border-color:var(--ok)}
+.pill.now{color:var(--accent);border-color:var(--accent)}
+/* Player = video mode: the stage fills the screen, the dock shrinks to one row of controls. */
+.player{position:relative}
+.player .stage{height:max(340px,calc(100dvh - 330px))}
+.player .resume{position:absolute;left:50%;bottom:22px;transform:translateX(-50%);width:auto;z-index:5;box-shadow:0 10px 40px rgba(0,0,0,.5)}
+body[data-view="player"] #voiceSetup{display:none}
+body[data-view="player"] .typed,body[data-view="player"] .transport label{display:none}
+body[data-view="player"] .status{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:15px}
+body[data-view="player"] .talk{width:68px;height:68px}
+body[data-view="player"]{padding-bottom:170px}
+header button{padding:7px 11px;font-size:15px}
+.cc{min-height:3.2em;font-size:18px;line-height:1.45;text-align:center;color:var(--ink);padding-inline:8px;text-wrap:balance}
+.script span{transition:background .2s}
+.script span.on{background:var(--hl);border-radius:4px}
+.opts{display:grid;gap:8px}
+.opts button{text-align:left;display:flex;gap:10px}
+.opts b{font-family:var(--display);color:var(--accent)}
+.opts button.right{border-color:var(--ok);box-shadow:inset 0 0 0 1px var(--ok)}
+.opts button.wrong{border-color:var(--bad);box-shadow:inset 0 0 0 1px var(--bad)}
+select{font:inherit;max-width:100%;padding:10px;border-radius:8px;color:var(--ink);background:var(--surface)}
+header{flex-wrap:wrap}
+textarea{width:100%;min-height:200px;font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:12px;resize:vertical}
+.interim{color:var(--muted);font-style:italic;min-height:1.5em}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chips span{font-size:14px;padding:3px 10px;border-radius:99px;background:var(--hl)}
+.confirm{border:2px solid var(--accent)}
+.resume{font-size:22px;padding:18px;width:100%}
+/* Voice dock */
+.dock{position:fixed;left:0;right:0;bottom:0;background:var(--surface);border-top:1px solid var(--line);padding:12px 16px calc(12px + env(safe-area-inset-bottom,0px))}
+.dock-in{max-width:760px;margin:0 auto;display:grid;grid-template-columns:1fr auto;gap:10px 16px;align-items:center}
+.status{font-weight:700;min-width:0}
+.heard{color:var(--muted);font-size:15px;min-height:1.4em;overflow-wrap:anywhere}
+.talk{grid-row:span 2;width:84px;height:84px;border-radius:50%;background:var(--accent);color:var(--accent-ink);border:0;display:grid;place-items:center;font-weight:800;font-family:var(--display)}
+.talk.live{background:var(--live);animation:pulse 1.2s infinite}
+.talk.dict{background:var(--live)}
+@keyframes pulse{50%{box-shadow:0 0 0 12px color-mix(in srgb,var(--live) 25%,transparent)}}
+@media (prefers-reduced-motion:reduce){.talk.live{animation:none}}
+.transport{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:8px}
+.transport button{padding:8px 12px;font-size:15px}
+.typed{grid-column:1/-1;display:flex;gap:8px}
+.typed input{flex:1;min-width:0;font:inherit;padding:8px 10px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--ink)}
+.warn{border-color:var(--bad);color:var(--bad)}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand" id="brand">Voice<span>Learn</span> <small class="muted" style="font:400 13px var(--body)">prototype</small></div>
+  <button id="voiceSetup">Check my voice</button><button id="help">What can I say?</button>
+</header>
+<main id="main"></main>
+
+<div class="dock">
+  <div class="dock-in">
+    <div class="status" id="status" role="status" aria-live="polite">Tap Talk, or press Space, and say “continue learning”.</div>
+    <button class="talk" id="talk" aria-label="Talk">TALK</button>
+    <div class="heard" id="heard"></div>
+    <div class="transport">
+      <button id="bPrev">⏮ Back</button>
+      <button id="bPlay">▶ Play</button>
+      <button id="bNext">Next ⏭</button>
+      <button id="bRate">1.0×</button>
+      <label class="row" style="font-size:15px"><input type="checkbox" id="autoL"> Voice turns during lessons and after replies</label>
+    </div>
+    <form class="typed" id="typed"><input id="typedIn" placeholder="No mic? Type a command, e.g. next lesson"><button>Send</button></form>
+  </div>
+</div>
+
+<script src="course.js"></script>
+<script src="scenes.js?v=1"></script>
+<script src="app.js?v=5"></script>
+</body>
+</html>

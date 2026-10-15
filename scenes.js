@@ -163,8 +163,15 @@
     lastKey = `${l}:${s}`;
     const L = C().lessons[l], sec = L.sections[s];
     const scene = S[`${L.id}:${s}`] || [{ at: 0, html: `<div class="st-kicker">Lesson ${l + 1}</div><h2 class="st-h">${sec.title}</h2>` }];
-    root.querySelector("#stCapL").innerHTML = `<b>Lesson ${l + 1}</b> · ${L.title}`;
-    root.querySelector("#stCapR").textContent = `${s + 1}/${L.sections.length}`;
+    loadBeats(`<b>Lesson ${l + 1}</b> · ${L.title}`, `${s + 1}/${L.sections.length}`, scene);
+    lastKey = `${l}:${s}`;
+  }
+
+  // Any custom scene (quizzes, assignments): beats = [{at, html, fx}]
+  function loadBeats(capL, capR, scene) {
+    lastKey = "custom:" + capL + capR;
+    root.querySelector("#stCapL").innerHTML = capL;
+    root.querySelector("#stCapR").textContent = capR;
     track.style.transition = "none"; track.style.transform = "translateY(0)";
     track.innerHTML = scene.map((b, i) => `<section class="st-beat" data-at="${b.at}" data-fx="${b.fx || ""}" data-i="${i}">${b.html}</section>`).join("");
     void track.offsetHeight; track.style.transition = "";
@@ -188,6 +195,7 @@
       if (k === "donut") b.querySelectorAll(".arc").forEach((x) => (x.style.strokeDashoffset = 301.6 * (1 - +x.dataset.pct / 100)));
       if (k === "tags") b.querySelector(".st-frac").classList.add("show-tags");
       if (k === "route") setTimeout(() => b.querySelector(".st-route").classList.add("broken"), 1500);
+      if (k === "reveal") b.closest(".st-track").querySelectorAll(".st-opt[data-right]").forEach((o) => o.classList.add("right"));
     }, 350);
   }
 
@@ -208,7 +216,9 @@
     const focus = newest && last && last.contains(newest) ? newest : last;
     if (focus) {
       const top = focus.getBoundingClientRect().top - track.getBoundingClientRect().top;
-      const y = Math.max(0, top + focus.offsetHeight / 2 - root.clientHeight * 0.45);
+      // Never scroll further than needed to show the last revealed beat, so short scenes stay fully visible.
+      const lastBottom = last.getBoundingClientRect().bottom - track.getBoundingClientRect().top;
+      const y = Math.max(0, Math.min(top + focus.offsetHeight / 2 - root.clientHeight * 0.45, lastBottom - root.clientHeight + 48));
       track.style.transform = `translateY(${-y}px)`;
     }
     bar.style.width = Math.min(100, ((cur + 1) / (max + 1)) * 100) + "%";
@@ -216,5 +226,5 @@
 
   function showAll() { step(99); }
 
-  window.Scenes = { mount, load, step, showAll };
+  window.Scenes = { mount, load, loadBeats, step, showAll, item: it };
 })();

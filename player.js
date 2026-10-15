@@ -38,7 +38,7 @@
   const synth = window.speechSynthesis;
   // Listener's voice + speed (this device).
   const VKEY = "voicelearn.voice.v1";
-  let VS = { uri: "", rate: 1 };
+  let VS = { uri: "", rate: 1, pitch: 1 };
   try { VS = Object.assign(VS, JSON.parse(localStorage.getItem(VKEY)) || {}); } catch (e) {}
   const saveVS = () => { try { localStorage.setItem(VKEY, JSON.stringify(VS)); } catch (e) {} };
   const enVoices = () => synth.getVoices().filter((v) => /^en/i.test(v.lang));
@@ -56,7 +56,7 @@
       onSentence(i);
       const u = new SpeechSynthesisUtterance(list[i]), v = voice();
       if (v) { u.voice = v; u.lang = v.lang; } else u.lang = "en-US";
-      u.rate = VS.rate;
+      u.rate = VS.rate; u.pitch = VS.pitch;
       let started = false, ended = false, quiet = 0;
       const finish = () => { if (ended || my !== tok) return; ended = true; clearInterval(dog); i++; setTimeout(next, 120); };
       const dog = setInterval(() => {
@@ -360,7 +360,10 @@
   const showRate = () => { $("vRateOut").textContent = VS.rate.toFixed(2).replace(/0$/, "") + "×"; };
   // Re-speak the current sentence so a change is heard right away.
   const applyLive = () => { if (playing) play(); };
-  $("vBtn").onclick = () => { fillVoices(); $("vRate").value = VS.rate; showRate(); $("vPanel").hidden = !$("vPanel").hidden; };
+  const showPitch = () => { $("vPitchOut").textContent = VS.pitch < 0.95 ? "deeper" : VS.pitch > 1.05 ? "higher" : "normal"; };
+  $("vBtn").onclick = () => { fillVoices(); $("vRate").value = VS.rate; $("vPitch").value = VS.pitch; showRate(); showPitch(); $("vPanel").hidden = !$("vPanel").hidden; };
+  $("vPitch").oninput = (e) => { VS.pitch = +e.target.value; showPitch(); };
+  $("vPitch").onchange = () => { saveVS(); applyLive(); };
   $("vClose").onclick = () => ($("vPanel").hidden = true);
   $("vVoice").onchange = (e) => { VS.uri = e.target.value; saveVS(); applyLive(); };
   $("vRate").oninput = (e) => { VS.rate = +e.target.value; showRate(); };

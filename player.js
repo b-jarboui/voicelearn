@@ -362,7 +362,24 @@
     if (waiting) { P.sent = 0; waiting = false; return play(); } // repeat the question
     playing ? pause() : play();
   };
-  $("home").onclick = () => { pause(); waiting = false; renderHome(); };
+  $("home").onclick = () => { setFs(false); pause(); waiting = false; renderHome(); };
+
+  // ---------- full screen ----------
+  // Real Fullscreen API where allowed (Android, desktop); immersive CSS mode everywhere (iPhone Safari).
+  function setFs(on) {
+    if (on === document.body.classList.contains("fs")) return;
+    document.body.classList.toggle("fs", on);
+    $("fsBtn").textContent = on ? "✕" : "⛶";
+    $("fsBtn").setAttribute("aria-label", on ? "Exit full screen" : "Full screen");
+    try {
+      if (on && !document.fullscreenElement && document.documentElement.requestFullscreen) document.documentElement.requestFullscreen({ navigationUI: "hide" }).catch(() => {});
+      if (!on && document.fullscreenElement) document.exitFullscreen().catch(() => {});
+    } catch (e) {}
+    setTimeout(() => Scenes.step(0), 350); // re-centre the scene for the new size
+  }
+  $("fsBtn").onclick = () => setFs(!document.body.classList.contains("fs"));
+  document.addEventListener("fullscreenchange", () => { if (!document.fullscreenElement) setFs(false); });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") setFs(false); });
 
   // ---------- voice settings panel ----------
   function fillVoices() {

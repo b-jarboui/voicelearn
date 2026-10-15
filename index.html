@@ -58,6 +58,18 @@ button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
 .send{margin-top:6px}
 .fld{display:grid;gap:4px;font-size:15px;color:var(--muted)}
 .fld input{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px 12px;width:100%}
+#fsBtn{display:none;padding:12px 14px;border-radius:99px;font-size:18px;line-height:1}
+body[data-view="player"] #fsBtn{display:block}
+/* Full screen player: stage fills the screen, caption + controls float over it like a video player. */
+body.fs{overflow:hidden}
+body.fs header,body.fs .vpanel{display:none}
+body.fs .player .stage{position:fixed;inset:0;height:100dvh;border-radius:0;z-index:50}
+body.fs .cc{position:fixed;left:0;right:0;bottom:0;z-index:51;margin:0;padding:44px 20px calc(86px + env(safe-area-inset-bottom,0px));
+  color:#fff;background:linear-gradient(transparent,rgba(0,0,0,.75));pointer-events:none;text-shadow:0 1px 3px rgba(0,0,0,.6)}
+body.fs .bar{z-index:52;background:transparent;border:0}
+body.fs .bar .status{color:rgba(255,255,255,.8)}
+body.fs #fsBtn{background:rgba(20,20,24,.55);color:#fff;border-color:rgba(255,255,255,.3);backdrop-filter:blur(8px)}
+body.fs .send{display:none}
 #toggle{min-width:170px;padding:14px 22px;font-size:19px;border-radius:99px}
 </style>
 </head>
@@ -80,12 +92,13 @@ button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
 <main id="main"></main>
 <div class="bar"><div class="bar-in">
   <div class="status" id="status" role="status">Ready</div>
+  <button id="fsBtn" aria-label="Full screen">⛶</button>
   <button class="primary" id="toggle">▶ Continue</button>
 </div></div>
 
 <script src="course.js?v=2"></script>
 <script src="adaptive.js?v=1"></script>
 <script src="scenes.js?v=5"></script>
-<script src="player.js?v=9"></script>
+<script src="player.js?v=10"></script>
 </body>
 </html>

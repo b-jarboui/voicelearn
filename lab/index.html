@@ -25,6 +25,15 @@ h1{font:800 20px var(--display);margin:0} h1 span{color:var(--accent)}
 .cc{max-width:460px;margin:10px auto 0;text-align:center;font-size:16px;min-height:3em;text-wrap:balance}
 .ctl{max-width:460px;margin:8px auto 0;display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
 .ctl .primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:700;padding:9px 20px}
+/* Full screen: the frame fills the screen; caption and controls float over it like a video player. */
+body.fs{overflow:hidden}
+body.fs #frame{position:fixed;inset:0;max-width:none;height:100dvh;min-height:0;border-radius:0;z-index:50;margin:0}
+body.fs .cc{position:fixed;left:0;right:0;bottom:0;z-index:51;max-width:none;margin:0;padding:48px 20px calc(78px + env(safe-area-inset-bottom,0px));
+  color:#fff;font-size:18px;background:linear-gradient(transparent,rgba(0,0,0,.72));pointer-events:none;text-shadow:0 1px 3px rgba(0,0,0,.6)}
+body.fs .ctl{position:fixed;left:0;right:0;bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:52;margin:0}
+body.fs .ctl button{background:rgba(20,20,24,.55);color:#fff;border-color:rgba(255,255,255,.3);backdrop-filter:blur(8px)}
+body.fs .ctl .primary{background:#fff;color:#111;border-color:#fff}
+body.fs header,body.fs #replay,body.fs #quiet{display:none}
 </style>
 </head>
 <body>
@@ -40,6 +49,7 @@ h1{font:800 20px var(--display);margin:0} h1 span{color:var(--accent)}
   <button class="primary" id="play">▶ Play</button>
   <button id="replay">↺ Replay</button>
   <button id="quiet">Silent preview</button>
+  <button id="fs" aria-label="Full screen">⛶ Full screen</button>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
@@ -104,6 +114,20 @@ h1{font:800 20px var(--display);margin:0} h1 span{color:var(--accent)}
   $("play").onclick = () => (playing ? stop() : play(cur >= 0 && cur < section.sentences.length - 1 ? cur : 0));
   $("replay").onclick = () => { restart(false); play(0); };
   $("quiet").onclick = () => { restart(false); quiet(0); };
+  // Full screen: real Fullscreen API where allowed (Android, desktop), immersive CSS mode everywhere (iPhone).
+  function setFs(on) {
+    document.body.classList.toggle("fs", on);
+    $("fs").textContent = on ? "✕ Exit" : "⛶ Full screen";
+    try {
+      if (on && !document.fullscreenElement && document.documentElement.requestFullscreen) document.documentElement.requestFullscreen({ navigationUI: "hide" }).catch(() => {});
+      if (!on && document.fullscreenElement) document.exitFullscreen().catch(() => {});
+    } catch (e) {}
+    // let the style re-measure the new frame size
+    setTimeout(() => style.step(cur), 350);
+  }
+  $("fs").onclick = () => setFs(!document.body.classList.contains("fs"));
+  document.addEventListener("fullscreenchange", () => { if (!document.fullscreenElement && document.body.classList.contains("fs")) setFs(false); });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && document.body.classList.contains("fs")) setFs(false); });
   window.__lab = { show, restart, setStyle: (id) => { style = STYLES.find((s) => s.id === id); restart(false); }, setSection: (id) => { section = LAB.sections.find((s) => s.id === id); restart(false); } };
   restart(false);
 })();

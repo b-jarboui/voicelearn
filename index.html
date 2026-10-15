@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>VoiceLearn Prototype</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&display=swap">
-<link rel="stylesheet" href="scenes.css?v=5">
+<link rel="stylesheet" href="scenes.css?v=6">
 <style>
 /* Narrated presentation: the stage plays like a video; one Pause/Continue control. */
 :root{
@@ -63,9 +63,11 @@ body[data-view="player"] #fsBtn{display:block}
 /* Full screen player: stage fills the screen, caption + controls float over it like a video player. */
 body.fs{overflow:hidden}
 body.fs header,body.fs .vpanel{display:none}
-body.fs .player .stage{position:fixed;inset:0;height:100dvh;border-radius:0;z-index:50}
-body.fs .cc{position:fixed;left:0;right:0;bottom:0;z-index:51;margin:0;padding:44px 20px calc(86px + env(safe-area-inset-bottom,0px));
-  color:#fff;background:linear-gradient(transparent,rgba(0,0,0,.75));pointer-events:none;text-shadow:0 1px 3px rgba(0,0,0,.6)}
+/* The picture stops above a black caption band, so subtitles and controls never cover content. */
+body.fs{background:#000}
+body.fs .player .stage{position:fixed;left:0;right:0;top:0;bottom:calc(150px + env(safe-area-inset-bottom,0px));height:auto;border-radius:0;z-index:50}
+body.fs .cc{position:fixed;left:0;right:0;bottom:0;z-index:51;margin:0;height:calc(150px + env(safe-area-inset-bottom,0px));
+  padding:12px 20px 0;color:#fff;background:#000;pointer-events:none}
 body.fs .bar{z-index:52;background:transparent;border:0}
 body.fs .bar .status{color:rgba(255,255,255,.8)}
 body.fs #fsBtn{background:rgba(20,20,24,.55);color:#fff;border-color:rgba(255,255,255,.3);backdrop-filter:blur(8px)}
@@ -98,7 +100,7 @@ body.fs .send{display:none}
 
 <script src="course.js?v=2"></script>
 <script src="adaptive.js?v=1"></script>
-<script src="scenes.js?v=5"></script>
-<script src="player.js?v=10"></script>
+<script src="scenes.js?v=7"></script>
+<script src="player.js?v=11"></script>
 </body>
 </html>

@@ -173,7 +173,9 @@
     root.querySelector("#stCapL").innerHTML = capL;
     root.querySelector("#stCapR").textContent = capR;
     track.style.transition = "none"; track.style.transform = "translateY(0)";
-    track.innerHTML = scene.map((b, i) => `<section class="st-beat" data-at="${b.at}" data-fx="${b.fx || ""}" data-i="${i}">${b.html}</section>`).join("");
+    // inline px sizes scale with the stage too (--k, set by fit())
+    track.innerHTML = scene.map((b, i) => `<section class="st-beat" data-at="${b.at}" data-fx="${b.fx || ""}" data-i="${i}">${b.html}</section>`).join("")
+      .replace(/(\d*\.?\d+)px/g, "calc($1px*var(--k,1))");
     void track.offsetHeight; track.style.transition = "";
     beats = [...track.querySelectorAll(".st-beat")];
     items = [...track.querySelectorAll(".st-it")];
@@ -214,10 +216,14 @@
     // focus: dim older beats, glide the newest item to the middle of the frame
     beats.forEach((b) => b.classList.toggle("dim", b.classList.contains("in") && b !== last && beats.indexOf(b) < beats.indexOf(last) - 1));
     const focus = newest && last && last.contains(newest) ? newest : last;
-    if (focus) {
-      const top = focus.getBoundingClientRect().top - track.getBoundingClientRect().top;
+    // Whole scene shorter than the stage: centre it vertically. Otherwise glide to the newest item.
+    const tb = track.getBoundingClientRect();
+    const full = beats[beats.length - 1].getBoundingClientRect().bottom - tb.top, free = root.clientHeight - full - 24;
+    if (free > 0) track.style.transform = `translateY(${free / 2}px)`;
+    else if (focus) {
+      const top = focus.getBoundingClientRect().top - tb.top;
       // Never scroll further than needed to show the last revealed beat, so short scenes stay fully visible.
-      const lastBottom = last.getBoundingClientRect().bottom - track.getBoundingClientRect().top;
+      const lastBottom = last.getBoundingClientRect().bottom - tb.top;
       const y = Math.max(0, Math.min(top + focus.offsetHeight / 2 - root.clientHeight * 0.45, lastBottom - root.clientHeight + 48));
       track.style.transform = `translateY(${-y}px)`;
     }
@@ -226,5 +232,13 @@
 
   function showAll() { step(99); }
 
-  window.Scenes = { mount, load, loadBeats, step, showAll, item: it };
+  // Scale everything with the stage size: 1 in the normal view, larger in full screen.
+  function fit() {
+    if (!root) return;
+    const k = Math.max(1, Math.min(root.clientHeight / 600, root.clientWidth / 300, 2.2));
+    root.style.setProperty("--k", k.toFixed(3));
+    step(-1); // re-centre / re-glide for the new size
+  }
+
+  window.Scenes = { mount, load, loadBeats, step, showAll, fit, item: it };
 })();

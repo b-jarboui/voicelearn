@@ -30,7 +30,7 @@
   .ss .chip b{background:#fff;color:#111;border-radius:99px;padding:3px 9px;font-size:13px;white-space:nowrap}
   .ss .arr{font:800 130px/0.8 "Bricolage Grotesque";display:inline-block}
   .ss .stmt{font:800 24px/1.2 "Bricolage Grotesque";border-left:4px solid #fff;padding-left:12px}`;
-  const st = document.createElement("style"); st.textContent = css; document.head.appendChild(st);
+  const st = document.createElement("style"); st.textContent = LAB.k(css); document.head.appendChild(st);
 
   // Rich duotone backgrounds, one per card.
   const BG = ["linear-gradient(160deg,#0F5257 0%,#0B2B40 100%)", "linear-gradient(160deg,#E2552D 0%,#8C1C3E 100%)", "linear-gradient(160deg,#1C3FAA 0%,#0A1340 100%)",

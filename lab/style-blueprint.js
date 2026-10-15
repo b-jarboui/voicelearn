@@ -29,8 +29,9 @@
   .sb .side span{color:var(--muted);font-size:14px}
   .sb .stmt{font:800 26px/1.15 "Bricolage Grotesque",system-ui} .sb .stmt em{font-style:normal;color:var(--warm)}
   .sb-bar{position:absolute;left:0;bottom:0;height:3px;background:var(--acc);transition:width .6s;z-index:3}
+  [data-tall] .sb .grid{grid-template-columns:1fr}
   @media (prefers-reduced-motion:reduce){.sb *{transition:none!important}}`;
-  const st = document.createElement("style"); st.textContent = css; document.head.appendChild(st);
+  const st = document.createElement("style"); st.textContent = LAB.k(css); document.head.appendChild(st);
 
   let root, track, bar, els = [], n = 1;
   const html = (m) => {
@@ -70,8 +71,12 @@
         const c = e.querySelector(".card"); if (c) c.classList.toggle("new", +e.dataset.at === i); });
       const last = els.filter((e) => e.classList.contains("on")).pop();
       const f = newest || last;
-      if (f) { const top = f.getBoundingClientRect().top - track.getBoundingClientRect().top;
-        const bottom = last.getBoundingClientRect().bottom - track.getBoundingClientRect().top;
+      const tb = track.getBoundingClientRect();
+      // Whole section shorter than the screen: centre it. Otherwise glide to the newest item.
+      const full = els[els.length - 1].getBoundingClientRect().bottom - tb.top, free = root.clientHeight - full - 24;
+      if (free > 0) track.style.transform = `translateY(${free / 2}px)`;
+      else if (f) { const top = f.getBoundingClientRect().top - tb.top;
+        const bottom = last.getBoundingClientRect().bottom - tb.top;
         track.style.transform = `translateY(${-Math.max(0, Math.min(top + f.offsetHeight / 2 - root.clientHeight * 0.45, bottom - root.clientHeight + 40))}px)`; }
       bar.style.width = ((i + 1) / n) * 100 + "%";
     },

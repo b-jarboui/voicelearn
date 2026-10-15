@@ -63,7 +63,7 @@
   @media(prefers-reduced-motion:reduce){.cx-signal .cx-enter{animation:none}.cx-signal .cx-progress span,.cx-signal .cx-item{transition:none}}
   `;
   const sheet = document.createElement('style');
-  sheet.textContent = css;
+  sheet.textContent = window.LAB && LAB.k ? LAB.k(css) : css;
   document.head.appendChild(sheet);
   const node = (tag, cls, text) => {
     const el = document.createElement(tag);

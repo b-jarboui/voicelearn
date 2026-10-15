@@ -29,7 +29,7 @@
   .now .sk-arrow{transform:none;opacity:1}
   .sk-cap{position:absolute;top:14px;left:18px;right:18px;z-index:5;font:700 11px system-ui;letter-spacing:.14em;text-transform:uppercase;color:#fff;mix-blend-mode:difference}
   @media (prefers-reduced-motion:reduce){.sk *{transition:none!important}}`;
-  const st = document.createElement("style"); st.textContent = css; document.head.appendChild(st);
+  const st = document.createElement("style"); st.textContent = LAB.k(css); document.head.appendChild(st);
 
   const PAL = [["#1238FF", "#fff"], ["#FF4D2E", "#1a0a05"], ["#F2EFE6", "#141414"], ["#141414", "#F5F1E8"], ["#FFC93C", "#1d1600"], ["#0E8F6E", "#F3FFF9"]];
   const words = (t, base = 0, step = 0.07) => t.split(" ").map((w, i) => `<span class="sk-w"><span style="--d:${(base + i * step).toFixed(2)}s">${w}</span></span>`).join(" ");
@@ -65,7 +65,7 @@
       slides = keys.map((k, idx) => {
         const s = document.createElement("div"); const [bg, fg] = PAL[idx % PAL.length];
         s.className = "sk-slide"; s.style.background = bg; s.style.color = fg;
-        s.innerHTML = slideHtml(k === -1 ? cover : groups.get(k)); box.appendChild(s); return s;
+        s.innerHTML = LAB.k(slideHtml(k === -1 ? cover : groups.get(k))); box.appendChild(s); return s;
       });
     },
     step(i) {

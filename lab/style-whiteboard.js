@@ -31,8 +31,10 @@
   .sw .m.on .hl{background-size:100% 100%}
   .sw-pen{position:absolute;width:12px;height:12px;border-radius:50%;background:var(--blue);box-shadow:0 0 0 4px rgba(36,87,214,.18);z-index:4;
     transition:left 1s cubic-bezier(.4,0,.2,1),top 1s cubic-bezier(.4,0,.2,1),opacity .4s;opacity:0}
+  [data-tall] .sw .grid{grid-template-columns:1fr;gap:14px}
+  [data-tall] .sw .box{min-height:0}
   @media (prefers-reduced-motion:reduce){.sw *{transition:none!important}}`;
-  const st = document.createElement("style"); st.textContent = css; document.head.appendChild(st);
+  const st = document.createElement("style"); st.textContent = LAB.k(css); document.head.appendChild(st);
 
   // Hand-drawn shapes on a 100x100 box (preserveAspectRatio=none), jittered so no two look alike.
   let seed = 7; const r = (a) => { seed = (seed * 9301 + 49297) % 233280; return (seed / 233280 - 0.5) * a; };
@@ -80,7 +82,7 @@
         out += `<div class="m" data-at="${m.at}">${html(m)}</div>`;
       });
       if (group) out += "</div>";
-      board.innerHTML = out; board.style.transform = "translateY(0)"; pen.style.opacity = 0;
+      board.innerHTML = LAB.k(out); board.style.transform = "translateY(0)"; pen.style.opacity = 0;
       els = [...board.querySelectorAll(".m")];
       // non-wrapped drawn paths (formula line, arrows) follow the same on/off switch
       const ex = document.createElement("style"); ex.textContent = ".sw .m.on .d2 path,.sw .m.on .arrowsvg path{stroke-dashoffset:0!important}"; board.appendChild(ex);
@@ -89,10 +91,14 @@
       let newest = null;
       els.forEach((e) => { const on = +e.dataset.at <= i; if (on && !e.classList.contains("on")) newest = e; e.classList.toggle("on", on); });
       const last = els.filter((e) => e.classList.contains("on")).pop();
-      const f = newest || last; if (!f) return;
-      const tb = board.getBoundingClientRect(), fr = f.getBoundingClientRect();
+      const f = newest || last;
+      const tb = board.getBoundingClientRect();
+      // Whole section shorter than the screen: centre it. Otherwise follow the pen.
+      const full = els[els.length - 1].getBoundingClientRect().bottom - tb.top, free = root.clientHeight - full - 24;
+      if (!f) { board.style.transform = `translateY(${Math.max(0, free / 2)}px)`; return; }
+      const fr = f.getBoundingClientRect();
       const top = fr.top - tb.top, bottom = last.getBoundingClientRect().bottom - tb.top;
-      const y = Math.max(0, Math.min(top + f.offsetHeight / 2 - root.clientHeight * 0.45, bottom - root.clientHeight + 40));
+      const y = free > 0 ? -free / 2 : Math.max(0, Math.min(top + f.offsetHeight / 2 - root.clientHeight * 0.45, bottom - root.clientHeight + 40));
       board.style.transform = `translateY(${-y}px)`;
       pen.style.opacity = 1; pen.style.left = Math.min(root.clientWidth - 24, fr.right - tb.left - 6) + "px"; pen.style.top = top - y + f.offsetHeight - 6 + "px";
       clearTimeout(pen._t); pen._t = setTimeout(() => (pen.style.opacity = 0), 1800);

@@ -57,6 +57,8 @@ window.LAB = {
     one: '<rect x="5" y="5" width="14" height="14" rx="3"/><path d="M11 9l2-1v8"/>',
     link: '<path d="M10 14a4 4 0 0 0 6 0l3-3a4 4 0 0 0-6-6l-1 1"/><path d="M14 10a4 4 0 0 0-6 0l-3 3a4 4 0 0 0 6 6l1-1"/>',
   },
+  // Make every px size scale with the screen: the harness sets --k (1 = normal, larger in full screen).
+  k(css) { return css.replace(/(-?\d*\.?\d+)px/g, "calc($1px*var(--k,1))"); },
   icon(k, cls = "") {
     return `<svg class="${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${this.icons[k] || ""}</svg>`;
   },

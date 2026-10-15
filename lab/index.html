@@ -27,9 +27,11 @@ h1{font:800 20px var(--display);margin:0} h1 span{color:var(--accent)}
 .ctl .primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:700;padding:9px 20px}
 /* Full screen: the frame fills the screen; caption and controls float over it like a video player. */
 body.fs{overflow:hidden}
-body.fs #frame{position:fixed;inset:0;max-width:none;height:100dvh;min-height:0;border-radius:0;z-index:50;margin:0}
-body.fs .cc{position:fixed;left:0;right:0;bottom:0;z-index:51;max-width:none;margin:0;padding:48px 20px calc(78px + env(safe-area-inset-bottom,0px));
-  color:#fff;font-size:18px;background:linear-gradient(transparent,rgba(0,0,0,.72));pointer-events:none;text-shadow:0 1px 3px rgba(0,0,0,.6)}
+/* The picture stops above a caption band (like a video player), so subtitles never cover content. */
+body.fs{background:#000}
+body.fs #frame{position:fixed;left:0;right:0;top:0;bottom:calc(150px + env(safe-area-inset-bottom,0px));max-width:none;height:auto;min-height:0;border-radius:0;z-index:50;margin:0}
+body.fs .cc{position:fixed;left:0;right:0;bottom:0;z-index:51;max-width:none;margin:0;height:calc(150px + env(safe-area-inset-bottom,0px));
+  padding:14px 20px 0;color:#fff;font-size:18px;background:#000;pointer-events:none}
 body.fs .ctl{position:fixed;left:0;right:0;bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:52;margin:0}
 body.fs .ctl button{background:rgba(20,20,24,.55);color:#fff;border-color:rgba(255,255,255,.3);backdrop-filter:blur(8px)}
 body.fs .ctl .primary{background:#fff;color:#111;border-color:#fff}
@@ -54,12 +56,12 @@ body.fs header,body.fs #replay,body.fs #quiet{display:none}
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/roughjs@4.6.6/bundled/rough.js"></script>
-<script src="content.js?v=1"></script>
-<script src="style-blueprint.js?v=1"></script>
-<script src="style-kinetic.js?v=1"></script>
-<script src="style-whiteboard.js?v=1"></script>
-<script src="style-story.js?v=1"></script>
-<script src="style-codex.js?v=1" onerror="this.remove()"></script>
+<script src="content.js?v=3"></script>
+<script src="style-blueprint.js?v=3"></script>
+<script src="style-kinetic.js?v=3"></script>
+<script src="style-whiteboard.js?v=3"></script>
+<script src="style-story.js?v=3"></script>
+<script src="style-codex.js?v=3" onerror="this.remove()"></script>
 <script>
 (() => {
   const $ = (id) => document.getElementById(id);
@@ -79,10 +81,20 @@ body.fs header,body.fs #replay,body.fs #quiet{display:none}
     document.querySelectorAll("[data-x]").forEach((b) => (b.onclick = () => { section = LAB.sections.find((s) => s.id === b.dataset.x); restart(); }));
   }
   function stop() { tok++; synth.cancel(); clearTimeout(timer); playing = false; $("play").textContent = "▶ Play"; }
+  // Scale factor for every style: 1 in the normal frame, larger when the frame is bigger (full screen).
+  function fit() {
+    const f = $("frame"), r = f.firstChild; if (!r) return;
+    const k = Math.max(1, Math.min(f.clientHeight / 600, f.clientWidth / 300, 2.2));
+    r.style.setProperty("--k", k.toFixed(3));
+    // Tall portrait screen: grids use one column so content fills the height.
+    r.toggleAttribute("data-tall", f.clientHeight / f.clientWidth > 1.75);
+  }
+  window.addEventListener("resize", () => { fit(); style.step(cur); });
   function restart(autoplay = playing) {
     stop(); tabs(); cur = -1;
     $("frame").innerHTML = '<div class="stage-root"></div>';
     const root = $("frame").firstChild;
+    fit();
     style.mount(root); style.load(section); style.step(-1);
     $("cc").textContent = section.title;
     if (autoplay) play(0);
@@ -122,8 +134,8 @@ body.fs header,body.fs #replay,body.fs #quiet{display:none}
       if (on && !document.fullscreenElement && document.documentElement.requestFullscreen) document.documentElement.requestFullscreen({ navigationUI: "hide" }).catch(() => {});
       if (!on && document.fullscreenElement) document.exitFullscreen().catch(() => {});
     } catch (e) {}
-    // let the style re-measure the new frame size
-    setTimeout(() => style.step(cur), 350);
+    // let the style rescale and re-measure for the new frame size
+    setTimeout(() => { fit(); style.step(cur); }, 350);
   }
   $("fs").onclick = () => setFs(!document.body.classList.contains("fs"));
   document.addEventListener("fullscreenchange", () => { if (!document.fullscreenElement && document.body.classList.contains("fs")) setFs(false); });

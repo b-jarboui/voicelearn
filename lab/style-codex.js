@@ -98,7 +98,7 @@
       case 'item': {
         const icon = node('span','cx-icon'); icon.setAttribute('aria-hidden','true');
         // Only fixed local paths enter SVG markup; all course text uses textContent.
-        icon.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${icons[m.icon] || '<path d="m6 12 4 4 8-8"/>'}</svg>`;
+        icon.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${icons[m.icon] || (window.LAB && LAB.icons[m.icon]) || '<path d="m6 12 4 4 8-8"/>'}</svg>`;
         const copy = node('div');
         copy.append(node('h3','',m.title),node('p','',m.text));
         el.append(icon,copy,node('span','cx-index',m.n == null ? '' : `${String(m.n).padStart(2,'0')}${m.of ? ' / '+m.of : ''}`));
@@ -168,7 +168,6 @@
     step(i) {
       if (!section || !root) return;
       const current = Number.isFinite(i) ? Math.trunc(i) : -1;
-      if (current === last) return;
       const active = entries.filter(({m})=>m.at<=current && current>=0);
       const newest = active.length ? active[active.length-1].m.at : -1;
       let delay = 0;
@@ -193,10 +192,13 @@
       // Scroll only this panel; never move the surrounding player or steal focus.
       if (active.length) {
         const target = active[active.length-1].el;
-        const bottom = target.getBoundingClientRect().bottom - scroll.getBoundingClientRect().top + scroll.scrollTop;
-        if (bottom > scroll.scrollTop + scroll.clientHeight - 24 || (last != null && current < last)) {
-          scroll.scrollTop = Math.max(0,bottom-scroll.clientHeight+24);
-        }
+        const fit = (force) => {
+          const bottom = target.getBoundingClientRect().bottom - scroll.getBoundingClientRect().top + scroll.scrollTop;
+          if (force || bottom > scroll.scrollTop + scroll.clientHeight - 24) scroll.scrollTop = Math.max(0,bottom-scroll.clientHeight+24);
+        };
+        fit(last != null && current < last);
+        // re-check once the entrance animation has settled (its transform skews the first measurement)
+        clearTimeout(scroll._fitT); scroll._fitT = setTimeout(() => fit(false), 650);
       } else scroll.scrollTop = 0;
       last = current;
     }

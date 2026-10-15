@@ -56,12 +56,12 @@ body.fs header,body.fs #replay,body.fs #quiet{display:none}
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/roughjs@4.6.6/bundled/rough.js"></script>
-<script src="content.js?v=3"></script>
+<script src="content.js?v=4"></script>
 <script src="style-blueprint.js?v=3"></script>
 <script src="style-kinetic.js?v=3"></script>
 <script src="style-whiteboard.js?v=3"></script>
 <script src="style-story.js?v=3"></script>
-<script src="style-codex.js?v=3" onerror="this.remove()"></script>
+<script src="style-codex.js?v=5" onerror="this.remove()"></script>
 <script>
 (() => {
   const $ = (id) => document.getElementById(id);
@@ -102,20 +102,27 @@ body.fs header,body.fs #replay,body.fs #quiet{display:none}
   function show(i) { cur = i; style.step(i); $("cc").textContent = section.sentences[i] || ""; }
   function play(from) {
     stop(); playing = true; $("play").textContent = "⏸ Pause";
-    const my = tok; let i = from;
-    const next = () => {
-      if (my !== tok) return;
-      if (i >= section.sentences.length) { playing = false; $("play").textContent = "▶ Play"; return; }
-      show(i);
-      const u = new SpeechSynthesisUtterance(section.sentences[i]); const v = voice();
+    // One continuous queue: no pause between sentences; each sentence's start drives the visuals.
+    const my = tok, list = section.sentences, v = voice();
+    let started = from - 1, quiet = 0;
+    const end = () => { if (my !== tok) return; clearInterval(dog); playing = false; $("play").textContent = "▶ Play"; };
+    for (let i = from; i < list.length; i++) {
+      const u = new SpeechSynthesisUtterance(list[i]);
       if (v) { u.voice = v; u.lang = v.lang; }
-      let done = false, quiet = 0, started = false;
-      const fin = () => { if (done || my !== tok) return; done = true; clearInterval(dog); i++; setTimeout(next, 250); };
-      const dog = setInterval(() => { if (my !== tok) return clearInterval(dog); if (synth.speaking) { started = true; quiet = 0; } else if (++quiet >= (started ? 3 : 10)) fin(); }, 500);
-      u.onend = fin; u.onerror = (e) => { if (e.error !== "interrupted" && e.error !== "canceled") fin(); };
+      let r = 1; try { r = (JSON.parse(localStorage.getItem("voicelearn.voice.v1")) || {}).rate || 1; } catch (e) {}
+      u.rate = r;
+      u.onstart = () => { if (my === tok && i > started) { started = i; show(i); } };
+      if (i === list.length - 1) u.onend = end;
       synth.speak(u);
-    };
-    next();
+    }
+    show(from);
+    const dog = setInterval(() => {
+      if (my !== tok) return clearInterval(dog);
+      if (synth.speaking || synth.pending) { quiet = 0; return; }
+      if (++quiet < 3) return;
+      clearInterval(dog);
+      if (started >= list.length - 1) end(); else play(Math.max(from + 1, started + 1)); // stalled: resume
+    }, 500);
   }
   // Silent preview: steps through moments on a timer (for comparing looks quickly).
   function quiet(from = 0) {

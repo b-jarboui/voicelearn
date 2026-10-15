@@ -85,13 +85,26 @@
     const n = Object.values(r).length, c = Object.values(r).filter(Boolean).length;
     return { n, c, score: n ? c / n : 0, by };
   }
-  // Outcome mastery = share correct in the student's last 4 answers on that outcome (recent evidence, not one lucky answer).
+  // Outcome mastery: if the latest round that tested an outcome asked 2+ questions on it, use that round's result
+  // (so passing a practice round counts as recovered). Otherwise use the last 4 answers, so one lucky answer
+  // can't hide repeated failures.
   function refreshMastery() {
     LOS.forEach((k) => {
-      const h = P.hist.filter((x) => x.lo === k).slice(-4);
-      if (h.length) P.lo[k] = h.filter((x) => x.ok).length / h.length;
+      const all = P.hist.filter((x) => x.lo === k);
+      if (!all.length) return;
+      const lastR = all[all.length - 1].r;
+      const inRound = lastR ? all.filter((x) => x.r === lastR) : [];
+      const h = inRound.length >= 2 ? inRound : all.slice(-4);
+      P.lo[k] = h.filter((x) => x.ok).length / h.length;
     });
   }
+  // Older saved progress has no round on each answer: recover it from the round records, then recompute.
+  P.hist.forEach((x) => {
+    if (x.r) return;
+    const keys = Object.keys(P.rounds).filter((rk) => x.id in P.rounds[rk]);
+    x.r = keys.sort((a, b) => +a.split(":")[1] - +b.split(":")[1]).pop();
+  });
+  refreshMastery(); save();
   function pickPractice(lo, k) {
     const pool = A.practice[lo].filter((q) => !P.seen[q.id]);
     const wrongCore = Object.values(A.core).flat().filter((q) => q.lo === lo && P.ans[q.id] === false);
@@ -233,7 +246,7 @@
     const st = cur(); if (st.kind !== "quiz" || P.part === "feedback") return;
     const q = script.q, ok = script.ord[pos] === 0;
     P.ans[q.id] = ok; P.seen[q.id] = true;
-    P.hist.push({ id: q.id, lo: q.lo, ok }); refreshMastery();
+    P.hist.push({ id: q.id, lo: q.lo, ok, r: rkey(st) }); refreshMastery();
     (P.rounds[rkey(st)] = P.rounds[rkey(st)] || {})[q.id] = ok;
     P.part = "feedback"; P.sent = 0; waiting = false; save();
     stopSpeech();
